@@ -27,7 +27,14 @@ Hardware
 
 customized following parameters in `.env`
 
-after customized `.env` file, run following command
+
+after customized `.env` file, run following command to download modelfile 
+
+```bash
+bash init_modelfiles.sh
+```
+
+then set up all service by docker compose
 
 ```bash
 docker compose up -d
@@ -38,10 +45,19 @@ checking the progress of the model serve preparation
 # main-LLM
 docker compose logs vllm -f
 # embed LLM
-# docker compose logs vllm-embed -f
+docker compose logs vllm-embed -f
+# open-webui
+docker compose logs openwebui -f
 ```
 
 after model seems standby, access your in browser and everything should be ok
+
+```bash
+# suppose ip:port of openwebui is 172.25.114:9:8080, then
+xdg-open http://172.25.114.9:8080
+```
+
+for host-guset port-mapping, please refer `docker-compose.yaml`
 
 
 ### Detailed

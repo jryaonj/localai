@@ -1,0 +1,316 @@
+# version: '3'
+services:
+  nginx:
+    image: 'jc21/nginx-proxy-manager:latest'
+    restart: unless-stopped
+    ports:
+      # These ports are in format <host-port>:<container-port>
+      - '80:80' # Public HTTP Port
+      - '443:443' # Public HTTPS Port
+      - '81:81' # Admin Web Port
+      # Add any other Stream port you want to expose
+      # - '21:21' # FTP
+    environment:
+      # Postgres parameters:
+      # Uncomment this if IPv6 is not enabled on your host
+      # DISABLE_IPV6: 'true'
+      INITIAL_ADMIN_EMAIL: ${NGX_ADMIN_EMAIL}
+      INITIAL_ADMIN_PASSWORD: ${NGX_ADMIN_PASSWORD}
+    volumes:
+      - ${DHOST_BASE_DIR}/ngx-data:/data
+      - ${DHOST_BASE_DIR}/letsencrypt:/etc/letsencrypt
+      - ${DHOST_DATA_DIR}/external:/hostdir/external
+      - ${DHOST_DATA_DIR}/shared:/hostdir/shared
+    networks:
+      localai02:
+        ipv4_address: ${NGINX_IPADDR}
+
+  pgsql:
+    container_name: localai-pgsql
+    image: postgres:latest
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      retries: 5
+      start_period: 30s
+      timeout: 10s
+    expose:
+      - 5432
+    volumes:
+      - ${DHOST_BASE_DIR}/pgsql:/var/lib/postgresql/data
+      - ${DHOST_DATA_DIR}/external:/hostdir/external
+      - ${DHOST_DATA_DIR}/shared:/hostdir/shared
+    restart: always
+    networks:
+      localai02:
+        ipv4_address: ${DB_IPADDR}
+
+  pgvector:
+    container_name: localai-pgvector
+    image: pgvector/pgvector:0.8.0-pg17
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      retries: 5
+      start_period: 30s
+      timeout: 10s 
+    expose:
+      - 5432
+    volumes:
+      - ${DHOST_BASE_DIR}/pgvector:/var/lib/postgresql/data
+      - ${DHOST_DATA_DIR}/external:/hostdir/external
+      - ${DHOST_DATA_DIR}/shared:/hostdir/shared
+    restart: always
+    networks:
+      localai02:
+        ipv4_address: ${PGVECTOR_IPADDR}
+
+  ollama:
+    container_name: localai-ollama
+    image: ollama/ollama
+    expose:
+      - 11434
+    environment:
+      - HF_ENDPOINT=https://hf-mirror.com
+      - OLLAMA_CONTEXT_LENGTH=8192
+      - OLLAMA_SCHED_SPREAD=1
+    volumes:
+      - ${DHOST_OLLAMA_DIR}:/root/.ollama
+      - ${DHOST_DATA_DIR}/external:/hostdir/external
+      - ${DHOST_DATA_DIR}/shared:/hostdir/shared
+    restart: always
+    healthcheck:
+      test: ["CMD", "/hostdir/external/busybox", "wget", "-qO-", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+    # deploy:
+      # resources:
+        # reservations:
+          # devices:
+            # - driver: nvidia
+            #   # device_ids: ["0"]   # index or full UUID
+            #   # count: 1 
+            #   count: all
+            #   capabilities: [gpu]
+    networks:
+      localai02:
+        ipv4_address: ${OLLAMA_IPADDR}    
+
+  vllm:
+    container_name: localai-vllm
+    image: vllm/vllm-openai
+    # command: >-
+    #   --model ${DEFAULT_MODELS} --host 0.0.0.0 --port 4997 --dtype=auto --tensor-parallel-size ${NUM_GPUS}
+    #   --max-model-len ${MAX_MODEL_LEN} --load-format auto --quantization awq_marlin --enable-chunked-prefill
+    #   --gpu-memory-utilization ${GPU_MEM_UTIL} --max-num-batched-tokens ${MAX_NUM_BATCHED_TOKENS} --max-num-seqs ${MAX_NUM_SEQS}
+    #   --rope-scaling '{"factor": 4.0, "original_max_position_embeddings": 32768, "rope_type": "yarn" }'
+    #   --served-model-name ${DEFAULT_MODELS} --kv-cache-dtype fp8_e4m3 --calculate-kv-scales
+    #   --preemption-mode swap
+    command: >-
+     --model swift/Qwen3-30B-A3B-AWQ --host 0.0.0.0 --port 4997 --dtype=auto --tensor-parallel-size ${NUM_GPUS}
+     --max-model-len ${MAX_MODEL_LEN} --load-format auto --quantization awq_marlin --enable-chunked-prefill
+     --gpu-memory-utilization 0.9 --max-num-batched-tokens 256 --max-num-seqs 16
+     --rope-scaling '{"factor": 4.0, "original_max_position_embeddings": 32768, "rope_type": "yarn" }'
+     --served-model-name ${DEFAULT_MODELS} --kv-cache-dtype fp8_e4m3 --calculate-kv-scales
+     --preemption-mode swap
+    shm_size: '24gb'
+    expose:
+      - 4997
+    environment:
+      - VLLM_ATTENTION_BACKEND=FLASHINFER 
+      - HF_ENDPOINT=https://hf-mirror.com
+      - VLLM_USE_MODELSCOPE=true
+    volumes:
+      - ${DHOST_VLLM_HF_DIR}:/root/.cache/huggingface
+      - ${DHOST_VLLM_MS_DIR}:/root/.cache/modelscope
+      - ${DHOST_DATA_DIR}/external:/hostdir/external
+      - ${DHOST_DATA_DIR}/shared:/hostdir/shared
+    restart: always
+    healthcheck:
+      test: ["CMD", "/hostdir/external/busybox", "wget" , "-qO-", "http://localhost:4997/v1/models"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    networks:
+      localai02:
+        ipv4_address: ${VLLM_IPADDR}
+
+  vllmemb:
+    container_name: localai-vllmemb
+    image: vllm/vllm-openai
+    command: >-
+      --model BAAI/bge-m3 --task embed --dtype auto --trust-remote-code --host 0.0.0.0 --port 4997 --hf_overrides '{"is_matryoshka":true}' --tensor-parallel-size ${NUM_GPUS} --max-model-len 8192 --load-format auto
+    shm_size: '24gb'
+    expose:
+      - 4997
+    environment:
+      - HF_ENDPOINT=https://hf-mirror.com
+      - VLLM_USE_MODELSCOPE=true
+    volumes:
+      - ${DHOST_VLLM_HF_DIR}:/root/.cache/huggingface
+      - ${DHOST_VLLM_MS_DIR}:/root/.cache/modelscope
+      - ${DHOST_DATA_DIR}/external:/hostdir/external
+      - ${DHOST_DATA_DIR}/shared:/hostdir/shared
+    restart: always
+    healthcheck:
+      test: ["CMD", "/hostdir/external/busybox", "wget" , "-qO-", "http://localhost:4997/v1/models"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    networks:
+      localai02:
+        ipv4_address: ${VLLMEMB_IPADDR}
+
+  tika:
+    # docker run -d -p 172.17.0.1:9998:9998 --restart always --name tika apache/tika:latest-full
+    container_name: localai-tika
+    image: apache/tika:latest-full
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "/hostdir/external/busybox wget -qO- http://localhost:9998| grep -qi 'Apache Tika'"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 25s
+    expose:
+      - 9998
+    volumes:
+      - ${DHOST_DATA_DIR}/external:/hostdir/external
+      - ${DHOST_DATA_DIR}/shared:/hostdir/shared
+    networks:
+      localai02:
+        ipv4_address: ${TIKA_IPADDR}
+
+  searxng:
+    container_name: localai-searxng
+    image: searxng/searxng
+    environment:
+      # -e "BASE_URL=http://localhost:$PORT/" \
+      # - BASE_URL=${SEARXNG_BASE_URL}
+      - BASE_URL=http://searxng:8080
+      - INSTANCE_NAME=searxng
+    expose:
+      - 8080
+    volumes:
+      - ${DHOST_BASE_DIR}/searxng:/etc/searxng
+      - ${DHOST_DATA_DIR}/external:/hostdir/external
+      - ${DHOST_DATA_DIR}/shared:/hostdir/shared
+    restart: always
+    healthcheck:
+      test: ["CMD", "/hostdir/external/busybox" ,"wget", "--quiet", "--spider", "http://localhost:8080"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+    networks:
+      localai02:
+        ipv4_address: ${SEARXNG_IPADDR}
+
+  playwright:
+    container_name: localai-playwright
+    image: mcr.microsoft.com/playwright:v1.52.0-noble
+    entrypoint: ["/bin/sh", "-c"]
+    command: >
+      "npx -y playwright@1.52.0 run-server --port 3000 --host 0.0.0.0"
+    expose:
+      - 3000
+    volumes:
+      - ${DHOST_DATA_DIR}/shared:/hostdir/shared
+    restart: always
+    networks:
+      localai02:
+        ipv4_address: ${PLAYWRIGHT_IPADDR}
+
+  openwebui:
+    container_name: localai-openwebui
+    #depends_on:
+    #  pgsql:
+    #    condition: service_healthy
+    #  pgvector:
+    #    condition: service_healthy
+    #  playwright:
+    #    condition: service_started
+    image: ghcr.io/open-webui/open-webui:main
+    environment:
+      - HF_ENDPOINT=https://hf-mirror.com 
+      - DEFAULT_MODELS=${DEFAULT_MODELS}
+      - OLLAMA_BASE_URLS=http://ollama:11434
+      - OPENAI_API_BASE_URLS=http://vllm:4997/v1
+      - OPENAI_API_KEY=${VLLM_TOK}
+      - TASK_MODEL=${TASK_MODEL}
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@pgsql:5432/openwebui
+      # - CODE_EXECUTION_JUPYTER_URL=
+      # - CODE_EXECUTION_JUPYTER_AUTH=
+      # - CODE_EXECUTION_JUPYTER_AUTH_TOKEN
+      # - CODE_EXECUTION_JUPYTER_AUTH_PASSWORD
+      # - CODE_EXECUTION_JUPYTER_TIMEOUT
+      # - CODE_INTERPRETER_JUPYTER_URL
+      - RAG_TEXT_SPLITTER=token
+      - VECTOR_DB=pgvector
+      - PGVECTOR_DB_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@pgvector:5432/openwebui
+      # - PGVECTOR_INITIALIZE_MAX_VECTOR_LENGTH=1536
+      - CONTENT_EXTRACTION_ENGINE=tika
+      - TIKA_SERVER_URL=http://tika:9998
+      - RAG_EMBEDDING_ENGINE=openai
+      - RAG_EMBEDDING_MODEL=${RAG_EMBEDDING_MODEL}
+      - RAG_OPENAI_API_BASE_URL=http://vllmemb:4997/v1
+      - RAG_OPENAI_API_KEY=${VLLMEMB_TOK}
+      - RAG_EMBEDDING_OPENAI_BATCH_SIZE=8
+      - RAG_TOP_K=12
+      - ENABLE_WEB_SEARCH=True
+      #- WEB_SEARCH_TRUST_ENV=
+      - WEB_SEARCH_ENGINE=searxng
+      - SEARXNG_QUERY_URL=http://searxng:8080/search?q=<query>
+      # playwright
+      - WEB_LOADER_ENGINE=playwright
+      - PLAYWRIGHT_WS_URL=ws://${PLAYWRIGHT_IPADDR}:3000
+    expose:
+      - 8080
+      - 3000
+    # host-guest port-mapping
+    # ports:
+    #   - 8080:8080
+    shm_size: '24gb'
+    volumes:
+      - ${DHOST_BASE_DIR}/openwebui:/app/backend/data
+      - ${DHOST_BASE_DIR}/misc/openwebui_start.sh:/app/backend/start.sh
+      - ${DHOST_BASE_DIR}/openwebui-nltk_data:/root/nltk_data
+      - ${DHOST_DATA_DIR}/external:/hostdir/external
+      - ${DHOST_DATA_DIR}/shared:/hostdir/shared
+    restart: always
+    networks:
+      localai02:
+        ipv4_address: ${OWEBUI_IPADDR}
+
+networks:
+  localai02:
+    external: true
+
+# create network
+# docker network create localai02 --subnet 172.25.114.0/24 --subnet fd80:dd00:a114::/48
