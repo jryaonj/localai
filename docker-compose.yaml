@@ -110,16 +110,16 @@ services:
     container_name: localai-vllm
     image: vllm/vllm-openai
     # command: >-
-    #   --model ${DEFAULT_MODELS} --host 0.0.0.0 --port 4997 --dtype=auto --tensor-parallel-size ${NUM_GPUS}
+    #   --model Qwen/Qwen3-32B-AWQ --host 0.0.0.0 --port 4997 --dtype=auto --tensor-parallel-size ${NUM_GPUS}
     #   --max-model-len ${MAX_MODEL_LEN} --load-format auto --quantization awq_marlin --enable-chunked-prefill
     #   --gpu-memory-utilization ${GPU_MEM_UTIL} --max-num-batched-tokens ${MAX_NUM_BATCHED_TOKENS} --max-num-seqs ${MAX_NUM_SEQS}
     #   --rope-scaling '{"factor": 4.0, "original_max_position_embeddings": 32768, "rope_type": "yarn" }'
-    #   --served-model-name ${DEFAULT_MODELS} --kv-cache-dtype fp8_e4m3 --calculate-kv-scales
+    #   --served-model-name Qwen/Qwen3-32B-AWQ --kv-cache-dtype fp8_e4m3 --calculate-kv-scales
     #   --preemption-mode swap
     command: >-
-     --model swift/Qwen3-30B-A3B-AWQ --host 0.0.0.0 --port 4997 --dtype=auto --tensor-parallel-size ${NUM_GPUS}
+     --model ${DEFAULT_MODELS} --host 0.0.0.0 --port 4997 --dtype=auto --tensor-parallel-size ${NUM_GPUS}
      --max-model-len ${MAX_MODEL_LEN} --load-format auto --quantization awq_marlin --enable-chunked-prefill
-     --gpu-memory-utilization 0.9 --max-num-batched-tokens 256 --max-num-seqs 16
+     --gpu-memory-utilization ${GPU_MEM_UTIL} --max-num-batched-tokens ${MAX_NUM_BATCHED_TOKENS} --max-num-seqs ${MAX_NUM_SEQS}
      --rope-scaling '{"factor": 4.0, "original_max_position_embeddings": 32768, "rope_type": "yarn" }'
      --served-model-name ${DEFAULT_MODELS} --kv-cache-dtype fp8_e4m3 --calculate-kv-scales
      --preemption-mode swap

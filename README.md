@@ -10,8 +10,14 @@ If you find this manual useful, just freeze and move on
 Hardware 
 * CPU >= 8c, single-thread score >=300 (cpu-z benchmark 17.01.64)
 * Memory >= 128 GB
-* GPU-enabled, Total Video Memory >= 32 GB, CUDA-arch `sm>=80`
+* GPU-enabled, Total Video Memory >= 24 GB, CUDA-arch `sm>=80`
 * Storage >= 500 GB
+
+In this demo , we using following configuration
+* 24GB video memory GPU x 1
+* vllm `BAAI/bge-m3` for embedding
+* vllm `swift/Qwen3-30B-A3B-AWQ` or `Qwen/Qwen3-32B-AWQ` for generation
+* ollama `qwen3:0.6b` for title generation and other task 
 
 ## components
 
