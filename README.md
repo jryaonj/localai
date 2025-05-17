@@ -25,6 +25,7 @@ In this demo , we using following configuration
 * [vllm-project/vllm](https://github.com/vllm-project/vllm/releases)
 * [Open WebUI](https://openwebui.com/)
 * [open-webui/open-webui](https://github.com/open-webui/open-webui)
+* [Tika](https://github.com/apache/tika)
 * [SearXNG](https://github.com/searxng/searxng)
 * [SearXNG Documentation](https://docs.searxng.org/)
 
@@ -52,6 +53,8 @@ checking the progress of the model serve preparation
 docker compose logs vllm -f
 # embed LLM
 docker compose logs vllm-embed -f
+# rerank LLM
+docker compose logs vllm-embed -f
 # open-webui
 docker compose logs openwebui -f
 ```
@@ -65,6 +68,33 @@ xdg-open http://172.25.114.9:8080
 
 for host-guset port-mapping, please refer `docker-compose.yaml`
 
+### capacity estimation - special memory allocation plan
+
+**example - 1x NVIDIA RTX 3090 GPU w. 24GB video memory 
+
+allocation plan as is
+
+|% of vMEM|Role|Model|Description|
+|---------|-----|-----------|
+|82.5, ~=19.9GB|main LLM |Qwen3-30B-A3B(AWQ/GPTQ-int4)| token generating |
+|~= 1.8GB | embed LLM |BAAI/bge-m3 | RAG-specified vLLM |
+|~= 1.8GB | reranker LLM |BAAI/bge-reranker-v2-m3 | RAG-specified vLLM |
+|~= 0.5GB | reserved | - | un-allocated |
+
+estimate theoretical token speed of the main-LLM (30B, 3B active) is like
+
+```text
+Qwen3-30B-A3B(AWQ/GPTQ-int4)
+  num_kv_heads=4,head_dim=128,layer=48,fp8=1
+  per token size = 4*128*48*1=24KB
+  model token length = 32768 (train-set)
+  model size = [params] 30.53 * ( [int4] 0.5 + [AWQ] 3/ 64 )  = 16.70 GB
+  active kv size per model-len = [k+v] 2 * 24KB * 32768 = 1.5 GB
+  
+throughput prompt   speed = [FP16   from `rtx3090`] 35.6 TFLOPS / 30.53B / [fp16->fp8] sqrt(2)  ~= 820 tok/s
+throughput generate speed = [mem-bw from `rtx3090`] 936.2 GT/s / 3B * [AWQ/GPTQ-int4] 2 ~= 624 tok/s
+max kv-cache token size = (19.9GB - [model and kv occupied size] 16.70 GB) / [kv-size per-model-len ] 1.5GB * [model-len] 32768 ~= 67806 tok (1.04 x)
+```
 
 ### Detailed
 

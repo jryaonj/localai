@@ -61,7 +61,7 @@ services:
       interval: 10s
       retries: 5
       start_period: 30s
-      timeout: 10s 
+      timeout: 10s
     expose:
       - 5432
     volumes:
@@ -99,12 +99,12 @@ services:
           # devices:
             # - driver: nvidia
             #   # device_ids: ["0"]   # index or full UUID
-            #   # count: 1 
+            #   # count: 1
             #   count: all
             #   capabilities: [gpu]
     networks:
       localai02:
-        ipv4_address: ${OLLAMA_IPADDR}    
+        ipv4_address: ${OLLAMA_IPADDR}
 
   vllm:
     container_name: localai-vllm
@@ -117,17 +117,20 @@ services:
     #   --served-model-name Qwen/Qwen3-32B-AWQ --kv-cache-dtype fp8_e4m3 --calculate-kv-scales
     #   --preemption-mode swap
     command: >-
-     --model ${DEFAULT_MODELS} --host 0.0.0.0 --port 4997 --dtype=auto --tensor-parallel-size ${NUM_GPUS}
-     --max-model-len ${MAX_MODEL_LEN} --load-format auto --quantization awq_marlin --enable-chunked-prefill
-     --gpu-memory-utilization ${GPU_MEM_UTIL} --max-num-batched-tokens ${MAX_NUM_BATCHED_TOKENS} --max-num-seqs ${MAX_NUM_SEQS}
-     --rope-scaling '{"factor": 4.0, "original_max_position_embeddings": 32768, "rope_type": "yarn" }'
-     --served-model-name ${DEFAULT_MODELS} --kv-cache-dtype fp8_e4m3 --calculate-kv-scales
-     --preemption-mode swap
+      --model ${DEFAULT_MODELS} --host 0.0.0.0 --port 4997 --dtype=auto --tensor-parallel-size ${NUM_GPUS}
+      --max-model-len ${MAX_MODEL_LEN} --load-format auto --quantization awq_marlin --enable-chunked-prefill
+      --gpu-memory-utilization ${GPU_MEM_UTIL} --max-num-batched-tokens ${MAX_NUM_BATCHED_TOKENS} --max-num-seqs ${MAX_NUM_SEQS}
+      --rope-scaling '{"factor": 4.0, "original_max_position_embeddings": 32768, "rope_type": "yarn" }'
+      --served-model-name ${DEFAULT_MODELS} --kv-cache-dtype fp8_e4m3 --calculate-kv-scales
+      --preemption-mode swap
+      --enable-prefix-caching
+    # so laggy
+    # --cpu-offload-gb 10
     shm_size: '24gb'
     expose:
       - 4997
     environment:
-      - VLLM_ATTENTION_BACKEND=FLASHINFER 
+      - VLLM_ATTENTION_BACKEND=FLASHINFER
       - HF_ENDPOINT=https://hf-mirror.com
       - VLLM_USE_MODELSCOPE=true
     volumes:
@@ -157,7 +160,11 @@ services:
     container_name: localai-vllmemb
     image: vllm/vllm-openai
     command: >-
-      --model BAAI/bge-m3 --task embed --dtype auto --trust-remote-code --host 0.0.0.0 --port 4997 --hf_overrides '{"is_matryoshka":true}' --tensor-parallel-size ${NUM_GPUS} --max-model-len 8192 --load-format auto
+      --model BAAI/bge-m3 --task embed --dtype auto --trust-remote-code --host 0.0.0.0 --port 4997 --hf_overrides '{"is_matryoshka":true}' --tensor-parallel-size ${NUM_GPUS} --max-model-len 3072 --load-format auto
+      --max-num-seqs ${MAX_NUM_SEQS}
+      --preemption-mode swap
+    # so laggy
+    # --cpu-offload-gb 10
     shm_size: '24gb'
     expose:
       - 4997
@@ -186,6 +193,61 @@ services:
     networks:
       localai02:
         ipv4_address: ${VLLMEMB_IPADDR}
+
+  vllmrrk:
+    container_name: localai-vllmrrk
+    image: vllm/vllm-openai
+    command: >-
+      --model BAAI/bge-reranker-v2-m3 --task score --dtype auto --trust-remote-code --host 0.0.0.0 --port 4997 --tensor-parallel-size ${NUM_GPUS}
+      --max-num-seqs ${MAX_NUM_SEQS}
+      --max-model-len 1024 --load-format auto
+    # fine-tuned for 1024
+    # so laggy
+    # --cpu-offload-gb 10
+    shm_size: '24gb'
+    expose:
+      - 4997
+    environment:
+      - HF_ENDPOINT=https://hf-mirror.com
+      - VLLM_USE_MODELSCOPE=true
+    volumes:
+      - ${DHOST_VLLM_HF_DIR}:/root/.cache/huggingface
+      - ${DHOST_VLLM_MS_DIR}:/root/.cache/modelscope
+      - ${DHOST_DATA_DIR}/external:/hostdir/external
+      - ${DHOST_DATA_DIR}/shared:/hostdir/shared
+    restart: always
+    healthcheck:
+      test: ["CMD", "/hostdir/external/busybox", "wget" , "-qO-", "http://localhost:4997/v1/models"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    networks:
+      localai02:
+        ipv4_address: ${VLLMRRK_IPADDR}
+
+  # docling:
+  #   container_name: localai-docling
+  #   image: quay.io/docling-project/docling-serve
+  #   environment:
+  #     - HF_ENDPOINT=https://hf-mirror.com
+  #     - DOCLING_SERVE_ENABLE_UI=true
+  #   restart: always
+  #   expose:
+  #     - 5001
+  #   volumes:
+  #     - ${DHOST_DATA_DIR}/external:/hostdir/external
+  #     - ${DHOST_DATA_DIR}/shared:/hostdir/shared
+  #   networks:
+  #     localai02:
+  #       ipv4_address: ${DOCLING_IPADDR}
 
   tika:
     # docker run -d -p 172.17.0.1:9998:9998 --restart always --name tika apache/tika:latest-full
@@ -258,7 +320,7 @@ services:
     #    condition: service_started
     image: ghcr.io/open-webui/open-webui:main
     environment:
-      - HF_ENDPOINT=https://hf-mirror.com 
+      - HF_ENDPOINT=https://hf-mirror.com
       - DEFAULT_MODELS=${DEFAULT_MODELS}
       - OLLAMA_BASE_URLS=http://ollama:11434
       - OPENAI_API_BASE_URLS=http://vllm:4997/v1

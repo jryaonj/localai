@@ -15,7 +15,15 @@ docker run -it --rm --entrypoint="" \
   -v ${DHOST_VLLM_MS_DIR}:/root/.cache/modelscope \
     vllm/vllm-openai \
       bash -c "modelscope download BAAI/bge-m3"
-    
+
+# prepare vllm reranker BAAI/bge-reranker-v2-m3
+docker run -it --rm --entrypoint="" \
+  -e HF_ENDPOINT=https://hf-mirror.com \
+  -v ${DHOST_VLLM_HF_DIR}:/root/.cache/huggingface \
+  -v ${DHOST_VLLM_MS_DIR}:/root/.cache/modelscope \
+    vllm/vllm-openai \
+      bash -c "modelscope download BAAI/bge-reranker-v2-m3"
+
 # # prepare vllm Qwen/Qwen3-32B-AWQ
 # docker run -it --rm --entrypoint="" \
 #   -e HF_ENDPOINT=https://hf-mirror.com \
