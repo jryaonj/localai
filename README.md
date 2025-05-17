@@ -70,12 +70,12 @@ for host-guset port-mapping, please refer `docker-compose.yaml`
 
 ### capacity estimation - special memory allocation plan
 
-**example - 1x NVIDIA RTX 3090 GPU w. 24GB video memory 
+**example - 1x NVIDIA RTX 3090 GPU w. 24GB video memory**
 
 allocation plan as is
 
 |% of vMEM|Role|Model|Description|
-|---------|-----|-----------|
+|---------|-----|-----------|-----|
 |82.5, ~=19.9GB|main LLM |Qwen3-30B-A3B(AWQ/GPTQ-int4)| token generating |
 |~= 1.8GB | embed LLM |BAAI/bge-m3 | RAG-specified vLLM |
 |~= 1.8GB | reranker LLM |BAAI/bge-reranker-v2-m3 | RAG-specified vLLM |
