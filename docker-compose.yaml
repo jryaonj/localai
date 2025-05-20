@@ -118,12 +118,16 @@ services:
     #   --preemption-mode swap
     command: >-
       --model ${DEFAULT_MODELS} --host 0.0.0.0 --port 4997 --dtype=auto --tensor-parallel-size ${NUM_GPUS}
-      --max-model-len ${MAX_MODEL_LEN} --load-format auto --quantization awq_marlin --enable-chunked-prefill
-      --gpu-memory-utilization ${GPU_MEM_UTIL} --max-num-batched-tokens ${MAX_NUM_BATCHED_TOKENS} --max-num-seqs ${MAX_NUM_SEQS}
+      --max-model-len ${MAX_MODEL_LEN} --load-format auto --quantization ${MODEL_QUANT} --enable-chunked-prefill
+      --gpu-memory-utilization ${GPU_MEM_UTIL}
+      --max-num-batched-tokens ${MAX_NUM_BATCHED_TOKENS} --max-num-seqs ${MAX_NUM_SEQS}
       --rope-scaling '{"factor": 4.0, "original_max_position_embeddings": 32768, "rope_type": "yarn" }'
       --served-model-name ${DEFAULT_MODELS} --kv-cache-dtype fp8_e4m3 --calculate-kv-scales
       --preemption-mode swap
       --enable-prefix-caching
+    # --speculative-config '${VLLM_SPEC_CFG}'
+    # --max-num-batched-tokens ${MAX_NUM_BATCHED_TOKENS} --max-num-seqs ${MAX_NUM_SEQS}
+    # --gpu-memory-utilization ${GPU_MEM_UTIL}
     # so laggy
     # --cpu-offload-gb 10
     shm_size: '24gb'
@@ -133,11 +137,13 @@ services:
       - VLLM_ATTENTION_BACKEND=FLASHINFER
       - HF_ENDPOINT=https://hf-mirror.com
       - VLLM_USE_MODELSCOPE=true
+      - PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
     volumes:
       - ${DHOST_VLLM_HF_DIR}:/root/.cache/huggingface
       - ${DHOST_VLLM_MS_DIR}:/root/.cache/modelscope
       - ${DHOST_DATA_DIR}/external:/hostdir/external
       - ${DHOST_DATA_DIR}/shared:/hostdir/shared
+      - ${DHOST_DATA_DIR}/misc/gptq_marlin.py:/usr/local/lib/python3.12/dist-packages/vllm/model_executor/layers/quantization/gptq_marlin.py
     restart: always
     healthcheck:
       test: ["CMD", "/hostdir/external/busybox", "wget" , "-qO-", "http://localhost:4997/v1/models"]
@@ -159,10 +165,14 @@ services:
   vllmemb:
     container_name: localai-vllmemb
     image: vllm/vllm-openai
+    # image: hostbuild/vllm-cpu-release:v0.8.5.post1.d1911020
     command: >-
-      --model BAAI/bge-m3 --task embed --dtype auto --trust-remote-code --host 0.0.0.0 --port 4997 --hf_overrides '{"is_matryoshka":true}' --tensor-parallel-size ${NUM_GPUS} --max-model-len 3072 --load-format auto
+      --model /root/.cache/modelscope/hub/models/BAAI/bge-m3
+      --served-model-name BAAI/bge-m3
+      --task embed --dtype auto --trust-remote-code --host 0.0.0.0 --port 4997 --hf_overrides '{"is_matryoshka":true}' --max-model-len 3072 --load-format auto
       --max-num-seqs ${MAX_NUM_SEQS}
       --preemption-mode swap
+      --tensor-parallel-size ${NUM_GPUS}
     # so laggy
     # --cpu-offload-gb 10
     shm_size: '24gb'
@@ -171,6 +181,11 @@ services:
     environment:
       - HF_ENDPOINT=https://hf-mirror.com
       - VLLM_USE_MODELSCOPE=true
+      - PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+      # - VLLM_CPU_KVCACHE_SPACE=16
+      # - VLLM_CPU_OMP_THREADS_BIND=0-23
+      # - OMP_NUM_THREADS=24
+    #ipc: host
     volumes:
       - ${DHOST_VLLM_HF_DIR}:/root/.cache/huggingface
       - ${DHOST_VLLM_MS_DIR}:/root/.cache/modelscope
@@ -197,10 +212,14 @@ services:
   vllmrrk:
     container_name: localai-vllmrrk
     image: vllm/vllm-openai
+    # image: hostbuild/vllm-cpu-release:v0.8.5.post1.d1911020
     command: >-
-      --model BAAI/bge-reranker-v2-m3 --task score --dtype auto --trust-remote-code --host 0.0.0.0 --port 4997 --tensor-parallel-size ${NUM_GPUS}
+      --model /root/.cache/modelscope/hub/models/BAAI/bge-reranker-v2-m3
+      --served-model-name BAAI/bge-reranker-v2-m3
+      --task score --dtype auto --trust-remote-code --host 0.0.0.0 --port 4997
       --max-num-seqs ${MAX_NUM_SEQS}
       --max-model-len 1024 --load-format auto
+      --tensor-parallel-size ${NUM_GPUS}
     # fine-tuned for 1024
     # so laggy
     # --cpu-offload-gb 10
@@ -210,6 +229,11 @@ services:
     environment:
       - HF_ENDPOINT=https://hf-mirror.com
       - VLLM_USE_MODELSCOPE=true
+      - PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+      # - VLLM_CPU_KVCACHE_SPACE=16
+      # - VLLM_CPU_OMP_THREADS_BIND=0-23
+      # - OMP_NUM_THREADS=24
+    # ipc: host
     volumes:
       - ${DHOST_VLLM_HF_DIR}:/root/.cache/huggingface
       - ${DHOST_VLLM_MS_DIR}:/root/.cache/modelscope
@@ -233,21 +257,21 @@ services:
       localai02:
         ipv4_address: ${VLLMRRK_IPADDR}
 
-  # docling:
-  #   container_name: localai-docling
-  #   image: quay.io/docling-project/docling-serve
-  #   environment:
-  #     - HF_ENDPOINT=https://hf-mirror.com
-  #     - DOCLING_SERVE_ENABLE_UI=true
-  #   restart: always
-  #   expose:
-  #     - 5001
-  #   volumes:
-  #     - ${DHOST_DATA_DIR}/external:/hostdir/external
-  #     - ${DHOST_DATA_DIR}/shared:/hostdir/shared
-  #   networks:
-  #     localai02:
-  #       ipv4_address: ${DOCLING_IPADDR}
+  docling:
+    container_name: localai-docling
+    image: quay.io/docling-project/docling-serve
+    environment:
+      - HF_ENDPOINT=https://hf-mirror.com
+      - DOCLING_SERVE_ENABLE_UI=true
+    restart: always
+    expose:
+      - 5001
+    volumes:
+      - ${DHOST_DATA_DIR}/external:/hostdir/external
+      - ${DHOST_DATA_DIR}/shared:/hostdir/shared
+    networks:
+      localai02:
+        ipv4_address: ${DOCLING_IPADDR}
 
   tika:
     # docker run -d -p 172.17.0.1:9998:9998 --restart always --name tika apache/tika:latest-full
