@@ -109,13 +109,6 @@ services:
   vllm:
     container_name: localai-vllm
     image: vllm/vllm-openai
-    # command: >-
-    #   --model Qwen/Qwen3-32B-AWQ --host 0.0.0.0 --port 4997 --dtype=auto --tensor-parallel-size ${NUM_GPUS}
-    #   --max-model-len ${MAX_MODEL_LEN} --load-format auto --quantization awq_marlin --enable-chunked-prefill
-    #   --gpu-memory-utilization ${GPU_MEM_UTIL} --max-num-batched-tokens ${MAX_NUM_BATCHED_TOKENS} --max-num-seqs ${MAX_NUM_SEQS}
-    #   --rope-scaling '{"factor": 4.0, "original_max_position_embeddings": 32768, "rope_type": "yarn" }'
-    #   --served-model-name Qwen/Qwen3-32B-AWQ --kv-cache-dtype fp8_e4m3 --calculate-kv-scales
-    #   --preemption-mode swap
     command: >-
       --model ${DEFAULT_MODELS} --host 0.0.0.0 --port 4997 --dtype=auto --tensor-parallel-size ${NUM_GPUS}
       --max-model-len ${MAX_MODEL_LEN} --load-format auto --quantization ${MODEL_QUANT} --enable-chunked-prefill
@@ -125,6 +118,7 @@ services:
       --served-model-name ${DEFAULT_MODELS} --kv-cache-dtype fp8_e4m3 --calculate-kv-scales
       --preemption-mode swap
       --enable-prefix-caching
+      --enable-reasoning --reasoning-parser deepseek_r1
     # --speculative-config '${VLLM_SPEC_CFG}'
     # --max-num-batched-tokens ${MAX_NUM_BATCHED_TOKENS} --max-num-seqs ${MAX_NUM_SEQS}
     # --gpu-memory-utilization ${GPU_MEM_UTIL}
@@ -136,7 +130,8 @@ services:
     environment:
       - VLLM_ATTENTION_BACKEND=FLASHINFER
       - HF_ENDPOINT=https://hf-mirror.com
-      - VLLM_USE_MODELSCOPE=true
+      # for Intel/DeepSeek-R1-0528-Qwen3-8B-int4-AutoRound-inc @ huggingface
+      # - VLLM_USE_MODELSCOPE=true
       - PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
     volumes:
       - ${DHOST_VLLM_HF_DIR}:/root/.cache/huggingface
@@ -257,24 +252,23 @@ services:
       localai02:
         ipv4_address: ${VLLMRRK_IPADDR}
 
-  docling:
-    container_name: localai-docling
-    image: quay.io/docling-project/docling-serve
-    environment:
-      - HF_ENDPOINT=https://hf-mirror.com
-      - DOCLING_SERVE_ENABLE_UI=true
-    restart: always
-    expose:
-      - 5001
-    volumes:
-      - ${DHOST_DATA_DIR}/external:/hostdir/external
-      - ${DHOST_DATA_DIR}/shared:/hostdir/shared
-    networks:
-      localai02:
-        ipv4_address: ${DOCLING_IPADDR}
+  # docling:
+  #   container_name: localai-docling
+  #   image: quay.io/docling-project/docling-serve
+  #   environment:
+  #     - HF_ENDPOINT=https://hf-mirror.com
+  #     - DOCLING_SERVE_ENABLE_UI=true
+  #   restart: always
+  #   expose:
+  #     - 5001
+  #   volumes:
+  #     - ${DHOST_DATA_DIR}/external:/hostdir/external
+  #     - ${DHOST_DATA_DIR}/shared:/hostdir/shared
+  #   networks:
+  #     localai02:
+  #       ipv4_address: ${DOCLING_IPADDR}
 
   tika:
-    # docker run -d -p 172.17.0.1:9998:9998 --restart always --name tika apache/tika:latest-full
     container_name: localai-tika
     image: apache/tika:latest-full
     restart: always
