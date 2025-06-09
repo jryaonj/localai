@@ -4,7 +4,7 @@ docker run -d --name ollama-tmpdown \
   -e HF_ENDPOINT=https://hf-mirror.com \
   -v ${DHOST_OLLAMA_DIR}:/root/.ollama \
     ollama/ollama
-docker exec -it --name ollama-tmpdown \
+docker exec -it ollama-tmpdown \
     ollama pull qwen3:0.6b
 docker rm -f ollama-tmpdown
 
