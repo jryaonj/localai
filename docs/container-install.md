@@ -31,12 +31,19 @@ cp .env.example .env
 # Edit .env with your settings
 ```
 
-2. Download models:
+2. Pull required Docker images (optional for blocked access/slow network):
+```bash
+# For users with limited Docker Hub access or slow networks
+# Edit DOCKERHUBPXY and GHCRPXY variables in init_dockerimg.sh if needed
+bash init_dockerimg.sh
+```
+
+3. Download models:
 ```bash
 bash init_modelfiles.sh
 ```
 
-3. Launch services:
+4. Launch services:
 ```bash
 docker compose up -d
 ```

@@ -1,29 +1,20 @@
 # version: '3'
 services:
-  nginx:
-    image: 'jc21/nginx-proxy-manager:latest'
-    restart: unless-stopped
-    ports:
-      # These ports are in format <host-port>:<container-port>
-      - '80:80' # Public HTTP Port
-      - '443:443' # Public HTTPS Port
-      - '81:81' # Admin Web Port
-      # Add any other Stream port you want to expose
-      # - '21:21' # FTP
-    environment:
-      # Postgres parameters:
-      # Uncomment this if IPv6 is not enabled on your host
-      # DISABLE_IPV6: 'true'
-      INITIAL_ADMIN_EMAIL: ${NGX_ADMIN_EMAIL}
-      INITIAL_ADMIN_PASSWORD: ${NGX_ADMIN_PASSWORD}
-    volumes:
-      - ${DHOST_BASE_DIR}/ngx-data:/data
-      - ${DHOST_BASE_DIR}/letsencrypt:/etc/letsencrypt
-      - ${DHOST_DATA_DIR}/external:/hostdir/external
-      - ${DHOST_DATA_DIR}/shared:/hostdir/shared
-    networks:
-      localai02:
-        ipv4_address: ${NGINX_IPADDR}
+  # nginx:
+  #   image: 'nginx:stable'
+  #   restart: unless-stopped
+  #   ports:
+  #     - '80:80'
+  #     - '443:443'
+  #   volumes:
+  #     - ${DHOST_BASE_DIR}/nginx/conf.d:/etc/nginx/conf.d
+  #     - ${DHOST_BASE_DIR}/nginx/ssl:/etc/nginx/ssl
+  #     - ${DHOST_BASE_DIR}/nginx/www:/usr/share/nginx/html
+  #     - ${DHOST_DATA_DIR}/external:/hostdir/external
+  #     - ${DHOST_DATA_DIR}/shared:/hostdir/shared
+  #   networks:
+  #     localai02:
+  #       ipv4_address: ${NGINX_IPADDR}
 
   pgsql:
     container_name: localai-pgsql
