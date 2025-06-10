@@ -66,7 +66,7 @@ services:
 
   ollama:
     container_name: localai-ollama
-    image: ollama/ollama
+    image: ollama/ollama:0.9.0
     expose:
       - 11434
     environment:
@@ -99,7 +99,7 @@ services:
 
   vllm:
     container_name: localai-vllm
-    image: vllm/vllm-openai
+    image: vllm/vllm-openai:v0.9.0.1
     command: >-
       --model ${DEFAULT_MODELS} --host 0.0.0.0 --port 4997 --dtype=auto --tensor-parallel-size ${NUM_GPUS}
       --max-model-len ${MAX_MODEL_LEN} --load-format auto --quantization ${MODEL_QUANT} --enable-chunked-prefill
@@ -150,7 +150,7 @@ services:
 
   vllmemb:
     container_name: localai-vllmemb
-    image: vllm/vllm-openai
+    image: vllm/vllm-openai:v0.9.0.1
     # image: hostbuild/vllm-cpu-release:v0.8.5.post1.d1911020
     command: >-
       --model /root/.cache/modelscope/hub/models/BAAI/bge-m3
@@ -197,7 +197,7 @@ services:
 
   vllmrrk:
     container_name: localai-vllmrrk
-    image: vllm/vllm-openai
+    image: vllm/vllm-openai:v0.9.0.1
     # image: hostbuild/vllm-cpu-release:v0.8.5.post1.d1911020
     command: >-
       --model /root/.cache/modelscope/hub/models/BAAI/bge-reranker-v2-m3

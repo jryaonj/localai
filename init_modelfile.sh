@@ -46,13 +46,14 @@ docker run -it --rm --entrypoint="" \
 # prepare vllm Intel/DeepSeek-R1-0528-Qwen3-8B-int4-AutoRound-inc
 docker run -it --rm --entrypoint="" \
   -e HF_ENDPOINT=https://hf-mirror.com \
-  -v ${DHOST_VLLM_DIR}:/root/.cache/huggingface
+  -v ${DHOST_VLLM_HF_DIR}:/root/.cache/huggingface \
     vllm/vllm-openai \
       bash -c "huggingface-cli download Intel/DeepSeek-R1-0528-Qwen3-8B-int4-AutoRound-inc"
 
 
 # busybox fetch
-docker create --name bb-tmp tmp busybox:uclibc
+mkdir ./external
+docker create --name bb-tmp busybox:uclibc
 docker cp bb-tmp:/bin/busybox ./external/busybox
 docker rm bb-tmp
 chmod +x ./external/busybox
