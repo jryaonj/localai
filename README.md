@@ -10,6 +10,7 @@ This project provides a complete setup for running local AI services using:
 - [SearXNG](https://docs.searxng.org/) for web search capabilities 
 - [Apache Tika](https://github.com/apache/tika) for document processing
 - [PostgreSQL](https://www.postgresql.org/) for data persistence
+- [OpenWebUI-Monitor](https://github.com/VariantConst/OpenWebUI-Monitor) for detailed user-activity tracking, quota management, and cost accounting
 
 ## Prerequisites
 
@@ -105,3 +106,4 @@ MIT License
 - [Open WebUI](https://openwebui.com/)
 - [SearXNG](https://docs.searxng.org/)
 - [Apache Tika](https://github.com/apache/tika)
+- [OpenWebUI-Monitor](https://github.com/VariantConst/OpenWebUI-Monitor)

@@ -18,7 +18,7 @@ services:
 
   pgsql:
     container_name: localai-pgsql
-    image: postgres:latest
+    image: postgres:17.5-bookworm
     environment:
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
@@ -261,7 +261,7 @@ services:
 
   tika:
     container_name: localai-tika
-    image: apache/tika:latest-full
+    image: apache/tika:3.2.0.0-full
     restart: always
     healthcheck:
       test: ["CMD-SHELL", "/hostdir/external/busybox wget -qO- http://localhost:9998| grep -qi 'Apache Tika'"]
@@ -280,7 +280,7 @@ services:
 
   searxng:
     container_name: localai-searxng
-    image: searxng/searxng
+    image: searxng/searxng:2025.6.9-d0bb977
     environment:
       # -e "BASE_URL=http://localhost:$PORT/" \
       # - BASE_URL=${SEARXNG_BASE_URL}
@@ -378,6 +378,62 @@ services:
     networks:
       localai02:
         ipv4_address: ${OWEBUI_IPADDR}
+
+  openwebui-monitor:
+    container_name: localai-openwebuimonit
+    image: variantconst/openwebui-monitor:0.3.7
+    ports:
+      - "7878:3000"
+    shm_size: '24gb'
+    environment:
+      - POSTGRES_HOST=pgsql-monitor
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=${POSTGRESMONIT_USER}
+      - POSTGRES_PASSWORD=${POSTGRESMONIT_PASSWORD}
+      - POSTGRES_DATABASE=${POSTGRESMONIT_DB}
+    env_file:
+      - .env
+    volumes:
+      - ${DHOST_DATA_DIR}/external:/hostdir/external
+      - ${DHOST_DATA_DIR}/shared:/hostdir/shared
+    depends_on:
+      pgsql-monitor:
+        condition: service_healthy
+    restart: always
+    networks:
+      localai02:
+        ipv4_address: ${OWEBUIMONIT_IPADDR}
+
+  pgsql-monitor:
+    container_name: localai-dbmonitor
+    # no need to set profiles as always start
+    # profiles:
+    #   - ${POSTGRESMONIT_HOST:+never}
+    #   - ${POSTGRESMONIT_HOST:-default}
+    image: postgres:17.5-bookworm
+    environment:
+      - POSTGRES_USER=${POSTGRESMONIT_USER}
+      - POSTGRES_PASSWORD=${POSTGRESMONIT_PASSWORD}
+      - POSTGRES_DB=${POSTGRESMONIT_DB}
+    expose:
+      - 5432
+    shm_size: '24gb'
+    volumes:
+      - ${DHOST_BASE_DIR}/pgsql_monitor:/var/lib/postgresql/data
+      - ${DHOST_DATA_DIR}/external:/hostdir/external
+      - ${DHOST_DATA_DIR}/shared:/hostdir/shared
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: always
+    networks:
+      localai02:
+        ipv4_address: ${DBMONITOR_IPADDR}
+
+volumes:
+  postgres_data:
 
 networks:
   localai02:
