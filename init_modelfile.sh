@@ -43,6 +43,13 @@ docker run -it --rm --entrypoint="" \
     vllm/vllm-openai \
       bash -c "modelscope download Qwen/Qwen3-30B-A3B-GPTQ-Int4"
 
+# prepare multimodal models
+docker run -it --rm --entrypoint="" \
+  -v ${DHOST_VLLM_HF_DIR}:/root/.cache/huggingface \
+  -v ${DHOST_VLLM_MS_DIR}:/root/.cache/modelscope \
+    vllm/vllm-openai \
+      bash -c "modelscope download Qwen/Qwen2.5-VL-3B-Instruct-AWQ"
+
 # prepare vllm Intel/DeepSeek-R1-0528-Qwen3-8B-int4-AutoRound-inc
 docker run -it --rm --entrypoint="" \
   -e HF_ENDPOINT=https://hf-mirror.com \

@@ -243,6 +243,61 @@ services:
       localai02:
         ipv4_address: ${VLLMRRK_IPADDR}
 
+  vllmmm:
+    container_name: localai-vllmmm
+    image: vllm/vllm-openai:v0.9.0.1
+    command: >-
+      --model ${MM_MODELS}
+      --served-model-name ${MM_MODELS}
+      --task generate
+      --dtype auto --trust-remote-code
+      --host 0.0.0.0 --port 4997
+      --tensor-parallel-size ${NUM_GPUS}
+      --quantization ${MM_MODEL_QUANT}
+      --max-model-len ${MM_MAX_MODEL_LEN}
+      --max-num-batched-tokens ${MM_MAX_NUM_BATCHED_TOKENS}
+      --max-num-seqs ${MM_MAX_NUM_SEQS}
+      --preemption-mode swap 
+      --gpu-memory-utilization ${MM_GPU_MEM_UTIL}
+      --limit-mm-per-prompt ${MM_LIMIT_MM_PER_PROMPT}
+      --allowed-local-media-path /data/uploads
+      --enable-chunked-prefill 
+    shm_size: '24gb'
+    expose:
+      - 4997
+    environment:
+      - HF_ENDPOINT=https://hf-mirror.com
+      - VLLM_USE_MODELSCOPE=true
+      - PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+      # - VLLM_CPU_KVCACHE_SPACE=16
+      # - VLLM_CPU_OMP_THREADS_BIND=0-23
+      # - OMP_NUM_THREADS=24
+    # ipc: host
+    volumes:
+      - ${DHOST_VLLM_HF_DIR}:/root/.cache/huggingface
+      - ${DHOST_VLLM_MS_DIR}:/root/.cache/modelscope
+      - ${DHOST_DATA_DIR}/external:/hostdir/external
+      - ${DHOST_DATA_DIR}/shared:/hostdir/shared
+      - ${DHOST_DATA_DIR}/misc/gptq_marlin.py:/usr/local/lib/python3.12/dist-packages/vllm/model_executor/layers/quantization/gptq_marlin.py
+      - ${DHOST_DATA_DIR}/uploads:/data/uploads
+    restart: always
+    healthcheck:
+      test: ["CMD", "/hostdir/external/busybox", "wget" , "-qO-", "http://localhost:4997/v1/models"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    networks:
+      localai02:
+        ipv4_address: ${VLLMMM_IPADDR}
+
   # docling:
   #   container_name: localai-docling
   #   image: quay.io/docling-project/docling-serve
@@ -305,10 +360,10 @@ services:
 
   playwright:
     container_name: localai-playwright
-    image: mcr.microsoft.com/playwright:v1.52.0-noble
+    image: mcr.microsoft.com/playwright:v1.49.1-noble
     entrypoint: ["/bin/sh", "-c"]
     command: >
-      "npx -y playwright@1.52.0 run-server --port 3000 --host 0.0.0.0"
+      "npx -y playwright@1.49.1 run-server --port 3000 --host 0.0.0.0"
     expose:
       - 3000
     volumes:
@@ -391,8 +446,18 @@ services:
       - POSTGRES_USER=${POSTGRESMONIT_USER}
       - POSTGRES_PASSWORD=${POSTGRESMONIT_PASSWORD}
       - POSTGRES_DATABASE=${POSTGRESMONIT_DB}
-    env_file:
-      - .env
+      - POSTGRES_DB=${POSTGRESMONIT_DB}
+      - OPENWEBUI_DOMAIN=${OPENWEBUI_DOMAIN}
+      - OPENWEBUI_API_KEY=${OPENWEBUI_API_KEY}
+      - ACCESS_TOKEN=${ACCESS_TOKEN}
+      - API_KEY=${API_KEY}
+      - DEFAULT_MODEL_INPUT_PRICE=${DEFAULT_MODEL_INPUT_PRICE}
+      - DEFAULT_MODEL_OUTPUT_PRICE=${DEFAULT_MODEL_OUTPUT_PRICE}
+      - DEFAULT_MODEL_PER_MSG_PRICE=${DEFAULT_MODEL_PER_MSG_PRICE}
+      - INIT_BALANCE=${INIT_BALANCE}
+      - COST_ON_INLET=${COST_ON_INLET}
+    # env_file:
+    #   - .env
     volumes:
       - ${DHOST_DATA_DIR}/external:/hostdir/external
       - ${DHOST_DATA_DIR}/shared:/hostdir/shared
@@ -414,6 +479,7 @@ services:
     environment:
       - POSTGRES_USER=${POSTGRESMONIT_USER}
       - POSTGRES_PASSWORD=${POSTGRESMONIT_PASSWORD}
+      - POSTGRES_DATABASE=${POSTGRESMONIT_DB}
       - POSTGRES_DB=${POSTGRESMONIT_DB}
     expose:
       - 5432
@@ -423,7 +489,7 @@ services:
       - ${DHOST_DATA_DIR}/external:/hostdir/external
       - ${DHOST_DATA_DIR}/shared:/hostdir/shared
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRESMONIT_USER} -d ${POSTGRESMONIT_DB}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -431,6 +497,54 @@ services:
     networks:
       localai02:
         ipv4_address: ${DBMONITOR_IPADDR}
+
+  # please make a local build, or import from dockerhub first
+  # then check the vram utilization
+  # comfyui:
+  #   container_name: localai-comfyui
+  #   image: comfyui:v0.3.40-cu128
+  #   entrypoint: ["/bin/bash", "-c"]
+  #   command: >
+  #     ". /opt/comfyui-torch/.venv/bin/activate && python main.py --lowvram --listen 0.0.0.0 --port 8188"
+  #   runtime: nvidia                      # or "rocm" if you built an AMD image
+  #   environment:
+  #     # - HF_ENDPOINT=https://hf-mirror.com
+  #     # - VLLM_USE_MODELSCOPE=true
+  #     # - PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+  #     - PYTORCH_CUDA_ALLOC_CONF="max_split_size_mb:256,garbage_collection_threshold:0.3"
+  #     # - VLLM_CPU_KVCACHE_SPACE=16
+  #     # - VLLM_CPU_OMP_THREADS_BIND=0-23
+  #     # - OMP_NUM_THREADS=24
+  #   expose:
+  #     - 8188                             # web UI
+  #   volumes:
+  #     - ${DHOST_DATA_DIR}/comfyui/models:/opt/comfyui/models
+  #     - ${DHOST_DATA_DIR}/comfyui/custom_nodes:/opt/comfyui/custom_nodes
+  #     - ${DHOST_DATA_DIR}/comfyui/input:/opt/comfyui/input
+  #     - ${DHOST_DATA_DIR}/comfyui/output:/opt/comfyui/output
+  #     # - ${DHOST_DATA_DIR}/comfyui/config:/opt/comfyui/config            # server-config.json etc.
+  #     # - ${DHOST_DATA_DIR}/comfyui/extra_model_paths.yaml:/opt/comfyui/extra_model_paths.yaml:ro   # if you maintain one
+  #     - ${DHOST_VLLM_HF_DIR}:/root/.cache/huggingface
+  #     - ${DHOST_VLLM_MS_DIR}:/root/.cache/modelscope
+  #     - ${DHOST_DATA_DIR}/external:/hostdir/external
+  #     - ${DHOST_DATA_DIR}/shared:/hostdir/shared
+  #   restart: always
+  #   healthcheck:
+  #     test: ["CMD", "/hostdir/external/busybox", "wget", "-qO-", "http://localhost:8188/"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 5
+  #     start_period: 60s
+  #   deploy:
+  #     resources:
+  #       reservations:
+  #         devices:
+  #           - driver: nvidia
+  #             count: all
+  #             capabilities: [gpu]
+  #   networks:
+  #     localai02:
+  #       ipv4_address: ${COMFYUI_IPADDR}
 
 volumes:
   postgres_data:

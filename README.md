@@ -5,7 +5,8 @@ An end-to-end solution for deploying local AI services with optimized performanc
 ## Overview
 
 This project provides a complete setup for running local AI services using:
-- [vLLM](https://docs.vllm.ai/) as the high-performance inference backend
+- [vLLM](https://docs.vllm.ai/) as the high-performance inference backend (text-only)
+- [vLLM-MM](https://docs.vllm.ai/en/latest/multimodal.html) for multi-modal (vision-language) inference
 - [Open-WebUI](https://openwebui.com/) as the user interface
 - [SearXNG](https://docs.searxng.org/) for web search capabilities 
 - [Apache Tika](https://github.com/apache/tika) for document processing
@@ -27,6 +28,7 @@ Our tested setup uses:
   - Main LLM: Intel/DeepSeek-R1-0528-Qwen3-8B-int4-AutoRound-inc
   - Embedding: BAAI/bge-m3
   - Reranker: BAAI/bge-reranker-v2-m3
+  - Multi-Modal LLM: Qwen/Qwen2.5-VL-3B-Instruct-AWQ (image understanding)
   - Auxiliary: ollama qwen3:0.6b
 
 ## Quick Start
@@ -57,6 +59,8 @@ docker compose logs vllmemb -f
 docker compose logs vllmrrk -f
 # Check UI
 docker compose logs openwebui -f
+# Check multi-modal LLM
+docker compose logs vllmmm -f
 ```
 
 5. Access the interface:
@@ -68,9 +72,10 @@ xdg-open http://<your-ip>:8080
 
 | Component | Memory | Model | Purpose |
 |-----------|---------|-------|---------|
-| Main LLM | 19.44GB | Qwen3-8B(int4) | Token generation |
+| Main LLM | 9.1GB | Qwen3-8B(int4) | Token generation |
 | Embedding | 1.8GB | BAAI/bge-m3 | RAG embeddings |
-| Reranker | 1.8GB | BAAI/bge-reranker-v2-m3 | RAG reranking |
+| Reranker | 2.0GB | BAAI/bge-reranker-v2-m3 | RAG reranking |
+| Multi-Modal LLM | 10.1GB | Qwen2.5-VL-3B(int4) | Vision-Language generation |
 | Reserved | 0.5GB | - | Multi-tasking buffer |
 
 ## Deployment Options
@@ -90,9 +95,9 @@ See [Local Installation Guide](docs/local-installation.md) for:
 ## Performance
 
 Theoretical metrics for Qwen3-8B(int4):
-- Prompt processing: ~3074 tokens/s
-- Generation speed: ~228 tokens/s  
-- Max context length: 192366 tokens
+- Prompt processing:  ~6293 tokens/s
+- Generation speed:   ~468 tokens/s  
+- Max context length: 32768 tokens x2.41 (0.395 utilization on RTX 3090 24GB)
 
 For detailed performance analysis and tuning, see [Performance Guide](docs/performance.md).
 
