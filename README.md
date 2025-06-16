@@ -25,11 +25,12 @@ This project provides a complete setup for running local AI services using:
 Our tested setup uses:
 - 1x NVIDIA RTX 3090 (24GB VRAM)
 - Models:
-  - Main LLM: Intel/DeepSeek-R1-0528-Qwen3-8B-int4-AutoRound-inc
+  - Main LLM: Qwen/Qwen3-4B-AWQ (text, thinking, etc)
   - Embedding: BAAI/bge-m3
   - Reranker: BAAI/bge-reranker-v2-m3
   - Multi-Modal LLM: Qwen/Qwen2.5-VL-3B-Instruct-AWQ (image understanding)
   - Auxiliary: ollama qwen3:0.6b
+  - [Optional] Image Generation: ComfyUI (self-built, keep caution on VRAM usage!)
 
 ## Quick Start
 
@@ -46,6 +47,8 @@ bash init_modelfiles.sh
 
 3. Launch services:
 ```bash
+# Check docker-compose.yaml first
+# and do extra step when enable comfyui feature
 docker compose up -d
 ```
 
@@ -72,7 +75,7 @@ xdg-open http://<your-ip>:8080
 
 | Component | Memory | Model | Purpose |
 |-----------|---------|-------|---------|
-| Main LLM | 9.1GB | Qwen3-8B(int4) | Token generation |
+| Main LLM | 9.1GB | Qwen3-4B(int4) | Token generation |
 | Embedding | 1.8GB | BAAI/bge-m3 | RAG embeddings |
 | Reranker | 2.0GB | BAAI/bge-reranker-v2-m3 | RAG reranking |
 | Multi-Modal LLM | 10.1GB | Qwen2.5-VL-3B(int4) | Vision-Language generation |
@@ -94,7 +97,7 @@ See [Local Installation Guide](docs/local-installation.md) for:
 
 ## Performance
 
-Theoretical metrics for Qwen3-8B(int4):
+Theoretical metrics for Qwen3-4B(int4):
 - Prompt processing:  ~6293 tokens/s
 - Generation speed:   ~468 tokens/s  
 - Max context length: 32768 tokens x2.41 (0.395 utilization on RTX 3090 24GB)
@@ -112,3 +115,9 @@ MIT License
 - [SearXNG](https://docs.searxng.org/)
 - [Apache Tika](https://github.com/apache/tika)
 - [OpenWebUI-Monitor](https://github.com/VariantConst/OpenWebUI-Monitor)
+- [ComfyUI](https://github.com/comfyanonymous/ComfyUI)
+- [Qwen](https://qwenlm.github.io/)
+- [Hugging Face](https://huggingface.co/)
+- [ModelScope](https://www.modelscope.cn/)
+
+
